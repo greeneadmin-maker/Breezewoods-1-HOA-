@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the HOA Ledger system.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User's Google account email."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["Pending", "Admin", "President", "Collector"],
+          "description": "Role of the user, determining access level."
+        },
+        "name": {
+          "type": "string",
+          "description": "User's full name from Google Sign-In."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["email", "role", "name", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Stores user profiles and their RBAC roles."
+    }
+  }
+}

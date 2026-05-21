@@ -1,0 +1,6 @@
+{
+  "name": "Breezewoods 1 HOA Ledger",
+  "description": "A modern web and mobile-responsive application built in React to replace manual ledger books. Handles payment tracking, automatic delinquency calculation, and Statement of Account (SOA) generation for internal HOA staff.",
+  "requestFramePermissions": ["clipboard-read", "clipboard-write"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

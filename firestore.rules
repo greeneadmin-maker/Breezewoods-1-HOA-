@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    function isSignedIn() {
+      // Note: Google accounts have email_verified == true
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'greene.smm.1@gmail.com' || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin')
+      );
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role', 'name', 'createdAt', 'updatedAt']) &&
+             data.keys().size() == 5 &&
+             data.email is string && data.email.size() <= 200 &&
+             data.role in ['Pending', 'Admin', 'President', 'Collector'] &&
+             data.name is string && data.name.size() <= 200 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    match /settings/{settingId} {
+      allow get: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /pending_payments/{paymentId} {
+      allow read: if isSignedIn(); // admin/collectors can read in the app
+      allow write: if true; // anyone can submit a payment proof or update it
+    }
+
+    match /public_portal/{homeownerId} {
+      allow read: if true; // public can view individual portal
+      allow write: if true; // server sync needs to overwrite
+    }
+    
+    match /users/{userId} {
+      // Admins can see all. Users can see their own.
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Only admins can list users (for the dashboard)
+      allow list: if isSignedIn() && isAdmin();
+      
+      allow create: if isSignedIn() &&
+                    isValidId(userId) &&
+                    request.auth.uid == userId &&
+                    isValidUser(incoming()) &&
+                    incoming().email == request.auth.token.email &&
+                    // Enforce Pending role for new registrants, unless created by Admin (or bootstrap user)
+                    (incoming().role == 'Pending' || isAdmin()) &&
+                    incoming().createdAt == request.time &&
+                    incoming().updatedAt == request.time;
+                    
+      allow update: if isSignedIn() &&
+                    isValidId(userId) &&
+                    isValidUser(incoming()) &&
+                    incoming().createdAt == existing().createdAt &&
+                    incoming().updatedAt == request.time &&
+                    (
+                      // Admin can update roles
+                      (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'updatedAt'])) ||
+                      // Users can update their own names
+                      (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'updatedAt']))
+                    );
+    }
+  }
+}
